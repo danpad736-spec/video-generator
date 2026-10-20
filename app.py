@@ -3,12 +3,11 @@ import streamlit as st
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import AudioFileClip, VideoClip, CompositeVideoClip
-from moviepy.video.io.VideoFileClip import VideoFileClip
 
 st.set_page_config(page_title="AI Custom Video Generator", page_icon="🎬", layout="centered")
 
 st.title("🎬 AI Video & Animation Generator with VO")
-st.markdown("Upload Voice Over (.wav/.mp3), tulis instruksi atau kustomisasi animasi, dan rakit menjadi video pendek (9:16) secara otomatis!")
+st.markdown("Upload Voice Over (.wav/.mp3), masukkan kode/instruksi animasi kustom, dan rakit menjadi video pendek (9:16) secara otomatis!")
 
 with st.form("video_generator_form"):
     st.subheader("1. 🎙️ Upload Voice Over (VO)")
@@ -17,19 +16,21 @@ with st.form("video_generator_form"):
     st.subheader("2. 📝 Teks Utama / Caption")
     video_text = st.text_area("Tulis teks yang ingin ditampilkan di video:", "Halo! Ini adalah video animasi otomatis yang disinkronkan dengan Voice Over.")
     
-    st.subheader("3. 💻 Instruksi / Kode Kustom Animasi & Warna")
-    st.markdown("Kamu bisa menuliskan instruksi gaya visual, atau parameter warna di sini:")
+    st.subheader("3. 💻 Kotak Instruksi & Kode Kustom Animasi")
+    st.markdown("Tempel atau ketik instruksi/logika animasi kustom di sini:")
+    custom_code = st.text_area(
+        "Instruksi / Kode Animasi:", 
+        "# Contoh instruksi:\n# Teks bergerak dari bawah ke atas mengikuti durasi audio\n# Ubah posisi atau efek visual sesuai keinginanmu",
+        height=100
+    )
     
     col1, col2 = st.columns(2)
     with col1:
         bg_color = st.color_picker("Warna Background Utama", "#1e1e2f")
-        animation_style = st.selectbox(
-            "Pilih Efek Animasi Teks",
-            ["Teks Diam di Tengah", "Efek Muncul Perlahan (Fade In)", "Teks Bergerak Naik (Scroll Up)"]
-        )
     with col2:
         text_color = st.color_picker("Warna Teks", "#ffffff")
-        font_size = st.slider("Ukuran Font", min_value=20, max_value=80, value=40)
+        
+    font_size = st.slider("Ukuran Font", min_value=20, max_value=80, value=40)
 
     submit_btn = st.form_submit_button("🚀 Proses & Render Video Sekarang")
 
@@ -59,27 +60,20 @@ if submit_btn:
                 bg_rgb = hex_to_rgb(bg_color)
                 txt_rgb = hex_to_rgb(text_color)
                 
-                # Buat fungsi pembuatan frame video berdasarkan animasi yang dipilih
+                # Buat fungsi pembuatan frame video
                 def make_frame(t):
-                    # Buat image kosong dengan warna background
                     img = Image.new("RGB", (w, h), color=bg_rgb)
                     draw = ImageDraw.Draw(img)
                     
-                    # Pengaturan font dasar (menggunakan default PIL jika tidak ada font kustom)
                     try:
                         font = ImageFont.truetype("arial.ttf", font_size)
                     except:
                         font = ImageFont.load_default()
                     
-                    # Logika posisi teks berdasarkan animasi
-                    text_y = h // 2
-                    if animation_style == "Efek Muncul Perlahan (Fade In)":
-                        # Efek sederhana teks bergerak turun dikit
-                        pass
-                    elif animation_style == "Teks Bergerak Naik (Scroll Up)":
-                        text_y = int((h // 2) - (t * 20)) % h
+                    # Logika dasar posisi teks (bisa dikembangkan berdasarkan custom_code)
+                    text_y = int((h // 2) - (t * 15)) % h if "bergerak" in custom_code.lower() else h // 2
                     
-                    # Format teks agar rapi (wrap sederhana)
+                    # Format teks agar rapi
                     max_chars_per_line = 25
                     words = video_text.split()
                     lines = []
@@ -93,12 +87,10 @@ if submit_btn:
                     if current_line:
                         lines.append(current_line)
                     
-                    # Gambar teks per baris ke tengah layar
                     total_text_height = len(lines) * (font_size + 10)
                     start_y = text_y - (total_text_height // 2)
                     
                     for i, line in enumerate(lines):
-                        # Estimasi lebar teks untuk center alignment
                         bbox = draw.textbbox((0, 0), line, font=font)
                         text_w = bbox[2] - bbox[0]
                         text_x = (w - text_w) // 2
@@ -107,11 +99,9 @@ if submit_btn:
                         
                     return np.array(img)
 
-                # Buat VideoClip dari fungsi frame dan gabungkan dengan audio
                 animation_clip = VideoClip(make_frame, duration=duration)
                 final_video = animation_clip.set_audio(audio_clip)
                 
-                # Render file output ke MP4
                 output_path = "output_video_custom.mp4"
                 final_video.write_videofile(
                     output_path,
@@ -122,10 +112,9 @@ if submit_btn:
                     logger=None
                 )
                 
-                st.success("🎉 Video animasi berhasil dibuat dan disinkronkan dengan VO!")
+                st.success("🎉 Video animasi berhasil dibuat!")
                 st.video(output_path)
                 
-                # Tombol download
                 with open(output_path, "rb") as file:
                     st.download_button(
                         label="📥 Download Video MP4",
@@ -134,7 +123,6 @@ if submit_btn:
                         mime="video/mp4"
                     )
                 
-                # Bersihkan memori klip
                 audio_clip.close()
                 final_video.close()
                 
