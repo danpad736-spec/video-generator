@@ -2,107 +2,145 @@ import os
 import streamlit as st
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from moviepy.editor import AudioFileClip, VideoClip, CompositeVideoClip
+from moviepy.editor import AudioFileClip, VideoClip, CompositeAudioClip, AudioClip
 
-st.set_page_config(page_title="AI Custom Video Generator", page_icon="🎬", layout="centered")
+st.set_page_config(page_title="AI Custom Video Generator Pro", page_icon="🎬", layout="centered")
 
-st.title("🎬 AI Video & Animation Generator with VO")
-st.markdown("Upload Voice Over (.wav/.mp3), masukkan kode/instruksi animasi kustom, dan rakit menjadi video pendek (9:16) secara otomatis!")
+st.title("🎬 AI Video Generator Pro (Multi-Shape Logo, SFX, & Sync VO)")
+st.markdown("Upload Voice Over, pilih bentuk logo geometris berbasis kode, atur teks sinkron per fase, dan render otomatis!")
 
-with st.form("video_generator_form"):
+with st.form("video_form"):
     st.subheader("1. 🎙️ Upload Voice Over (VO)")
     audio_file = st.file_uploader("Pilih file audio (.wav atau .mp3)", type=["mp3", "wav"])
     
-    st.subheader("2. 📝 Teks Utama / Caption")
-    video_text = st.text_area("Tulis teks yang ingin ditampilkan di video:", "Halo! Ini adalah video animasi otomatis yang disinkronkan dengan Voice Over.")
-    
-    st.subheader("3. 💻 Kotak Instruksi & Kode Kustom Animasi")
-    st.markdown("Tempel atau ketik instruksi/logika animasi kustom di sini:")
-    custom_code = st.text_area(
-        "Instruksi / Kode Animasi:", 
-        "# Contoh instruksi:\n# Teks bergerak dari bawah ke atas mengikuti durasi audio\n# Ubah posisi atau efek visual sesuai keinginanmu",
-        height=100
-    )
-    
+    st.subheader("2. 📝 Skrip Teks per Fase Waktu (Sinkronisasi)")
+    col_t1, col_t2 = st.columns(2)
+    with col_t1:
+        text_fase_1 = st.text_input("Fase Awal (0s - 2s):", "Tahukah kamu?")
+        text_fase_2 = st.text_input("Fase Kedua (2s - 5s):", "Otak manusia menghasilkan listrik")
+    with col_t2:
+        text_fase_3 = st.text_input("Fase Ketiga (5s - 8s):", "yang cukup untuk menyalakan lampu kecil!")
+        text_fase_4 = st.text_input("Fase Akhir (8s - Selesai):", "Pintar banget ya?")
+        
+    st.subheader("3. 🎨 Logo Berbasis Kode & Visual")
     col1, col2 = st.columns(2)
     with col1:
-        bg_color = st.color_picker("Warna Background Utama", "#1e1e2f")
+        bg_color = st.color_picker("Warna Background", "#1e1e2f")
+        logo_text = st.text_input("Inisial/Teks Logo:", "AI")
+        logo_shape = st.selectbox(
+            "Pilih Bentuk Logo Geometris", 
+            ["Lingkaran (Circle)", "Kotak (Rectangle)", "Segitiga (Triangle)", "Bintang (Star / Polygon)"]
+        )
     with col2:
-        text_color = st.color_picker("Warna Teks", "#ffffff")
+        text_color = st.color_picker("Warna Teks Utama", "#00ffcc")
+        logo_color = st.color_picker("Warna Bentuk Logo", "#ff5733")
+        enable_sfx = st.checkbox("Aktifkan Efek Suara SFX (Tone di awal)", value=True)
         
-    font_size = st.slider("Ukuran Font", min_value=20, max_value=80, value=40)
-
-    submit_btn = st.form_submit_button("🚀 Proses & Render Video Sekarang")
+    font_size = st.slider("Ukuran Font Teks", min_value=20, max_value=80, value=40)
+    
+    submit_btn = st.form_submit_button("🚀 Render Video Lengkap (Logo + SFX + Sync)")
 
 if submit_btn:
     if not audio_file:
-        st.warning("⚠️ Harap upload file Voice Over (audio) terlebih dahulu!")
+        st.warning("⚠️ Harap upload file Voice Over terlebih dahulu!")
     else:
-        with st.spinner("⏳ Sedang memproses audio, merakit animasi, dan merender video... Mohon tunggu ya..."):
+        with st.spinner("⏳ Merakit bentuk logo, teks sinkron, efek suara, dan merender video..."):
             try:
-                # Simpan audio sementara
+                # Simpan audio utama
                 audio_path = "temp_audio.wav"
                 with open(audio_path, "wb") as f:
                     f.write(audio_file.getbuffer())
                 
-                # Load audio untuk ambil durasi
                 audio_clip = AudioFileClip(audio_path)
                 duration = audio_clip.duration
                 
-                # Dimensi video vertikal 9:16 (TikTok/Reels)
-                w, h = 720, 1280
+                # Tambahkan Efek Suara (SFX) berbasis kode jika dicentang (misal: nada pendek di detik ke-0)
+                if enable_sfx:
+                    # Buat suara 'beep' pendek berdurasi 0.3 detik menggunakan formula matematika numpy
+                    def sfx_make_frame(t):
+                        # Nada frekuensi 440 Hz (A4) dengan fade out
+                        val = np.sin(440 * 2 * np.pi * t) * max(0, (0.3 - t) / 0.3)
+                        return np.array([val, val]).T
+                    
+                    sfx_clip = AudioClip(sfx_make_frame, duration=0.3).volumetrics(0.2)
+                    # Gabungkan audio utama dengan SFX di detik ke-0
+                    final_audio = CompositeAudioClip([audio_clip, sfx_clip.set_start(0)])
+                else:
+                    final_audio = audio_clip
                 
-                # Konversi warna HEX ke RGB tuple
+                w, h = 720, 1280 # Resolusi vertikal 9:16
+                
                 def hex_to_rgb(hex_str):
                     hex_str = hex_str.lstrip('#')
                     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
                 
                 bg_rgb = hex_to_rgb(bg_color)
                 txt_rgb = hex_to_rgb(text_color)
+                logo_rgb = hex_to_rgb(logo_color)
                 
-                # Buat fungsi pembuatan frame video
+                # Fungsi pembuat frame video per detik (t)
                 def make_frame(t):
                     img = Image.new("RGB", (w, h), color=bg_rgb)
                     draw = ImageDraw.Draw(img)
                     
                     try:
                         font = ImageFont.truetype("arial.ttf", font_size)
+                        font_logo = ImageFont.truetype("arial.ttf", 32)
                     except:
                         font = ImageFont.load_default()
+                        font_logo = ImageFont.load_default()
                     
-                    # Logika dasar posisi teks (bisa dikembangkan berdasarkan custom_code)
-                    text_y = int((h // 2) - (t * 15)) % h if "bergerak" in custom_code.lower() else h // 2
+                    # --- 1. MENGGAMBAR BERBAGAI BENTUK LOGO BERBASIS KODE ---
+                    cx, cy = w // 2, 220
+                    size = 70
                     
-                    # Format teks agar rapi
-                    max_chars_per_line = 25
-                    words = video_text.split()
-                    lines = []
-                    current_line = ""
-                    for word in words:
-                        if len(current_line + " " + word) <= max_chars_per_line:
-                            current_line += (" " + word) if current_line else word
-                        else:
-                            lines.append(current_line)
-                            current_line = word
-                    if current_line:
-                        lines.append(current_line)
+                    if "Lingkaran" in logo_shape:
+                        draw.ellipse([cx - size, cy - size, cx + size, cy + size], fill=logo_rgb)
+                    elif "Kotak" in logo_shape:
+                        draw.rectangle([cx - size, cy - size, cx + size, cy + size], fill=logo_rgb)
+                    elif "Segitiga" in logo_shape:
+                        points = [(cx, cy - size), (cx - size, cy + size), (cx + size, cy + size)]
+                        draw.polygon(points, fill=logo_rgb)
+                    elif "Bintang" in logo_shape:
+                        # Membuat bentuk poligon bintang bersudut banyak via kode matematika
+                        points = []
+                        for i in range(10):
+                            r = size if i % 2 == 0 else size // 2
+                            angle = i * np.pi / 5 - np.pi / 2
+                            points.append((cx + int(r * np.cos(angle)), cy + int(r * np.sin(angle))))
+                        draw.polygon(points, fill=logo_rgb)
                     
-                    total_text_height = len(lines) * (font_size + 10)
-                    start_y = text_y - (total_text_height // 2)
+                    # Tulis inisial di tengah logo
+                    bbox_logo = draw.textbbox((0, 0), logo_text, font=font_logo)
+                    lw = bbox_logo[2] - bbox_logo[0]
+                    lh = bbox_logo[3] - bbox_logo[1]
+                    draw.text((cx - lw // 2, cy - lh // 2), logo_text, fill=(255, 255, 255), font=font_logo)
                     
-                    for i, line in enumerate(lines):
-                        bbox = draw.textbbox((0, 0), line, font=font)
-                        text_w = bbox[2] - bbox[0]
-                        text_x = (w - text_w) // 2
-                        line_y = start_y + (i * (font_size + 10))
-                        draw.text((text_x, line_y), line, fill=txt_rgb, font=font)
-                        
+                    # --- 2. SINKRONISASI TEKS UTAMA PER FASE WAKTU ---
+                    if t < 2.0:
+                        active_text = text_fase_1
+                    elif 2.0 <= t < 5.0:
+                        active_text = text_fase_2
+                    elif 5.0 <= t < 8.0:
+                        active_text = text_fase_3
+                    else:
+                        active_text = text_fase_4
+                    
+                    # Efek animasi melayang tipis
+                    offset_y = int(np.sin(t * 3) * 8)
+                    text_y = (h // 2) + offset_y
+                    
+                    bbox = draw.textbbox((0, 0), active_text, font=font)
+                    text_w = bbox[2] - bbox[0]
+                    text_x = (w - text_w) // 2
+                    
+                    draw.text((text_x, text_y), active_text, fill=txt_rgb, font=font)
                     return np.array(img)
 
                 animation_clip = VideoClip(make_frame, duration=duration)
-                final_video = animation_clip.set_audio(audio_clip)
+                final_video = animation_clip.set_audio(final_audio)
                 
-                output_path = "output_video_custom.mp4"
+                output_path = "output_video_pro.mp4"
                 final_video.write_videofile(
                     output_path,
                     fps=24,
@@ -112,14 +150,14 @@ if submit_btn:
                     logger=None
                 )
                 
-                st.success("🎉 Video animasi berhasil dibuat!")
+                st.success("🎉 Video Pro dengan Berbagai Pilihan Bentuk Logo, SFX, & Sync VO Berhasil Dibuat!")
                 st.video(output_path)
                 
                 with open(output_path, "rb") as file:
                     st.download_button(
-                        label="📥 Download Video MP4",
+                        label="📥 Download Video MP4 Pro",
                         data=file,
-                        file_name="hasil_video_ai.mp4",
+                        file_name="video_pro_hasil.mp4",
                         mime="video/mp4"
                     )
                 
@@ -127,4 +165,4 @@ if submit_btn:
                 final_video.close()
                 
             except Exception as e:
-                st.error(f"❌ Terjadi kesalahan saat merender video: {e}")
+                st.error(f"❌ Terjadi kesalahan: {e}")
